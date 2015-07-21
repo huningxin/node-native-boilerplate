@@ -13,5 +13,6 @@ NAN_METHOD(aNumber);
 NAN_METHOD(anObject);
 NAN_METHOD(anArray);
 NAN_METHOD(callback);
+NAN_METHOD(fillBuffer);
 
 #endif

@@ -25,6 +25,8 @@ void InitAll(Handle<Object> exports) {
     NanNew<FunctionTemplate>(anArray)->GetFunction());
   exports->Set(NanNew<String>("callback"),
     NanNew<FunctionTemplate>(callback)->GetFunction());
+  exports->Set(NanNew<String>("fillBuffer"),
+    NanNew<FunctionTemplate>(fillBuffer)->GetFunction());
 }
 
 NODE_MODULE(NativeExtension, InitAll)
