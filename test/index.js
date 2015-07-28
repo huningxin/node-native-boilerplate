@@ -20,9 +20,17 @@ function inherits(target, source) {
 
 inherits(DepthCamera, EventEmitter);
 
-var obj = new DepthCamera();
-obj.on('event', function() {
+var dc = new DepthCamera();
+dc.on('event', function() {
     console.log('event');
 });
 
-obj.call_emit();
+dc.start(function(e){
+  console.log('start: ' + e);
+});
+
+dc.stop(function(e){
+  console.log('stop: ' + e);
+});
+
+dc.call_emit();

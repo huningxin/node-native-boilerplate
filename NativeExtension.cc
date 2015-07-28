@@ -17,6 +17,8 @@ class DepthCamera : public node::ObjectWrap {
   ~DepthCamera();
 
   static NAN_METHOD(New);
+  static NAN_METHOD(Start);
+  static NAN_METHOD(Stop);
   static NAN_METHOD(CallEmit);
   static v8::Persistent<v8::Function> constructor;
 };
@@ -38,6 +40,8 @@ void DepthCamera::Init(v8::Handle<v8::Object> exports) {
   tpl->InstanceTemplate()->SetInternalFieldCount(1);
 
   NODE_SET_PROTOTYPE_METHOD(tpl, "call_emit", CallEmit);
+  NODE_SET_PROTOTYPE_METHOD(tpl, "start", Start);
+  NODE_SET_PROTOTYPE_METHOD(tpl, "stop", Stop);
 
   NanAssignPersistent<v8::Function>(constructor, tpl->GetFunction());
   exports->Set(NanNew<v8::String>("DepthCamera"), tpl->GetFunction());
@@ -64,6 +68,22 @@ NAN_METHOD(DepthCamera::CallEmit) {
 
   NanMakeCallback(args.This(), "emit", 1, argv);
   NanReturnUndefined();
+}
+
+NAN_METHOD(DepthCamera::Start) {
+  NanScope();
+  v8::Local<v8::Function> callbackHandle = args[0].As<v8::Function>();
+  v8::Handle<v8::Value> arg = NanNew("success");
+  NanMakeCallback(NanGetCurrentContext()->Global(), callbackHandle, 1, &arg);
+  NanReturnUndefined();
+}
+
+NAN_METHOD(DepthCamera::Stop) {
+  NanScope();
+  v8::Local<v8::Function> callbackHandle = args[0].As<v8::Function>();
+  v8::Handle<v8::Value> arg = NanNew("success");
+  NanMakeCallback(NanGetCurrentContext()->Global(), callbackHandle, 1, &arg);
+  NanReturnUndefined(); 
 }
 
 void Init(v8::Handle<v8::Object> exports) {
