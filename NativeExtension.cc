@@ -7,6 +7,7 @@
  ********************************************************************/
 
 #include <nan.h>
+#include <uv.h>
 
 class DepthCamera : public node::ObjectWrap {
  public:
@@ -70,17 +71,52 @@ NAN_METHOD(DepthCamera::CallEmit) {
   NanReturnUndefined();
 }
 
+static uv_thread_t thread_id;
+static uv_async_t async;
+static int cmd = 0;
+
+static void thread_main(void* arg) {
+  printf("thread_main\n");
+  cmd = 1;
+  async.data = (void*) &cmd;
+  uv_async_send(&async);
+}
+
+v8::Persistent<v8::Function> startCallback;
+
+void handle_async_send(uv_async_t *handle, int) {
+    int data = *((int*) handle->data);
+    printf("handle_async_send %d\n", data);
+    switch (data) {
+      case 1: {
+        // start success
+        v8::Handle<v8::Value> arg = NanNew("success");
+        NanMakeCallback(NanGetCurrentContext()->Global(), startCallback, 1, &arg);
+        break;
+      }
+      case 2:
+        // stop success
+        break;
+    }
+}
+
 NAN_METHOD(DepthCamera::Start) {
   NanScope();
-  v8::Local<v8::Function> callbackHandle = args[0].As<v8::Function>();
-  v8::Handle<v8::Value> arg = NanNew("success");
-  NanMakeCallback(NanGetCurrentContext()->Global(), callbackHandle, 1, &arg);
+  NanAssignPersistent<v8::Function>(startCallback, args[0].As<v8::Function>());
+
+  uv_async_init(uv_default_loop(), &async, handle_async_send);
+
+  uv_thread_create(&thread_id, thread_main, NULL);
+
   NanReturnUndefined();
 }
 
 NAN_METHOD(DepthCamera::Stop) {
   NanScope();
   v8::Local<v8::Function> callbackHandle = args[0].As<v8::Function>();
+
+  uv_thread_join(&thread_id);
+
   v8::Handle<v8::Value> arg = NanNew("success");
   NanMakeCallback(NanGetCurrentContext()->Global(), callbackHandle, 1, &arg);
   NanReturnUndefined(); 

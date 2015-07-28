@@ -25,11 +25,11 @@ dc.on('event', function() {
     console.log('event');
 });
 
-dc.start(function(e){
+dc.start(function(e) {
   console.log('start: ' + e);
 });
 
-dc.stop(function(e){
+dc.stop(function(e) {
   console.log('stop: ' + e);
 });
 
