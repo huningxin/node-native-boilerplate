@@ -1,32 +1,73 @@
-#include <node.h>
+/*********************************************************************
+ * NAN - Native Abstractions for Node.js
+ *
+ * Copyright (c) 2015 NAN contributors
+ *
+ * MIT License <https://github.com/nodejs/nan/blob/master/LICENSE.md>
+ ********************************************************************/
+
 #include <nan.h>
-#include "functions.h"
 
-using v8::FunctionTemplate;
-using v8::Handle;
-using v8::Object;
-using v8::String;
+class DepthCamera : public node::ObjectWrap {
+ public:
+  static void Init(v8::Handle<v8::Object> exports);
 
-// NativeExtension.cc represents the top level of the module. 
-// C++ constructs that are exposed to javascript are exported here
+ private:
+  DepthCamera();
+  ~DepthCamera();
 
-void InitAll(Handle<Object> exports) {
-  exports->Set(NanNew<String>("nothing"),
-    NanNew<FunctionTemplate>(nothing)->GetFunction());
-  exports->Set(NanNew<String>("aString"),
-    NanNew<FunctionTemplate>(aString)->GetFunction());
-  exports->Set(NanNew<String>("aBoolean"),
-    NanNew<FunctionTemplate>(aBoolean)->GetFunction());
-  exports->Set(NanNew<String>("aNumber"),
-    NanNew<FunctionTemplate>(aNumber)->GetFunction());
-  exports->Set(NanNew<String>("anObject"),
-    NanNew<FunctionTemplate>(anObject)->GetFunction());
-  exports->Set(NanNew<String>("anArray"),
-    NanNew<FunctionTemplate>(anArray)->GetFunction());
-  exports->Set(NanNew<String>("callback"),
-    NanNew<FunctionTemplate>(callback)->GetFunction());
-  exports->Set(NanNew<String>("fillBuffer"),
-    NanNew<FunctionTemplate>(fillBuffer)->GetFunction());
+  static NAN_METHOD(New);
+  static NAN_METHOD(CallEmit);
+  static v8::Persistent<v8::Function> constructor;
+};
+
+v8::Persistent<v8::Function> DepthCamera::constructor;
+
+DepthCamera::DepthCamera() {
 }
 
-NODE_MODULE(NativeExtension, InitAll)
+DepthCamera::~DepthCamera() {
+}
+
+void DepthCamera::Init(v8::Handle<v8::Object> exports) {
+  NanScope();
+
+  // Prepare constructor template
+  v8::Local<v8::FunctionTemplate> tpl = NanNew<v8::FunctionTemplate>(New);
+  tpl->SetClassName(NanNew<v8::String>("DepthCamera"));
+  tpl->InstanceTemplate()->SetInternalFieldCount(1);
+
+  NODE_SET_PROTOTYPE_METHOD(tpl, "call_emit", CallEmit);
+
+  NanAssignPersistent<v8::Function>(constructor, tpl->GetFunction());
+  exports->Set(NanNew<v8::String>("DepthCamera"), tpl->GetFunction());
+}
+
+NAN_METHOD(DepthCamera::New) {
+  NanScope();
+
+  if (args.IsConstructCall()) {
+    DepthCamera* obj = new DepthCamera();
+    obj->Wrap(args.This());
+    NanReturnValue(args.This());
+  } else {
+    v8::Local<v8::Function> cons = NanNew<v8::Function>(constructor);
+    NanReturnValue(cons->NewInstance());
+  }
+}
+
+NAN_METHOD(DepthCamera::CallEmit) {
+  NanScope();
+  v8::Handle<v8::Value> argv[1] = {
+    NanNew("event"),  // event name
+  };
+
+  NanMakeCallback(args.This(), "emit", 1, argv);
+  NanReturnUndefined();
+}
+
+void Init(v8::Handle<v8::Object> exports) {
+  DepthCamera::Init(exports);
+}
+
+NODE_MODULE(DepthCamera, Init)

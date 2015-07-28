@@ -1,42 +1,28 @@
-var nativeExtension = require('../');
-var assert = require('assert');
 
+/*********************************************************************
+ * NAN - Native Abstractions for Node.js
+ *
+ * Copyright (c) 2015 NAN contributors
+ *
+ * MIT License <https://github.com/nodejs/nan/blob/master/LICENSE.md>
+ ********************************************************************/
 
-describe('native extension', function() {
-  it('should export function that returns nothing', function() {
-    assert.equal(nativeExtension.nothing(), undefined);
-  });
+const testRoot = require('path').resolve(__dirname, '..')
+    , DepthCamera = require('bindings')({ module_root: testRoot, bindings: 'DepthCamera' }).DepthCamera
+    , EventEmitter = require('events').EventEmitter;
 
-  it('should export a function that returns a string', function() {
-    assert.equal(typeof nativeExtension.aString(), 'string');
-  });
+// extend prototype
+function inherits(target, source) {
+    for (var k in source.prototype) {
+        target.prototype[k] = source.prototype[k];
+    }
+}
 
-  it('should export a function that returns a boolean', function() {
-    assert.equal(typeof nativeExtension.aBoolean(), 'boolean');
-  });
+inherits(DepthCamera, EventEmitter);
 
-  it('should export function that returns a number', function() {
-    assert.equal(typeof nativeExtension.aNumber(), 'number');
-  });
-
-  it('should export function that returns an object', function() {
-    assert.equal(typeof nativeExtension.anObject(), 'object');
-  });
-
-  it('should export function that returns an object with a key, value pair', function() {
-    assert.deepEqual(nativeExtension.anObject(), {'key': 'value'});
-  });
-
-  it('should export function that returns an array', function() {
-    assert.equal(Array.isArray(nativeExtension.anArray()), true);
-  });
-
-  it('should export function that returns an array with some values', function() {
-    assert.deepEqual(nativeExtension.anArray(), [1, 2, 3]);
-  });
-
-  it('should export function that calls a callback', function(done) {
-    nativeExtension.callback(done);
-  });
-  
+var obj = new DepthCamera();
+obj.on('event', function() {
+    console.log('event');
 });
+
+obj.call_emit();
