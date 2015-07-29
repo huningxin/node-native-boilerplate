@@ -28,7 +28,6 @@ class DepthCamera : public node::ObjectWrap {
   static NAN_METHOD(New);
   static NAN_METHOD(Start);
   static NAN_METHOD(Stop);
-  static NAN_METHOD(CallEmit);
   static v8::Persistent<v8::Function> constructor;
 };
 
@@ -48,7 +47,6 @@ void DepthCamera::Init(v8::Handle<v8::Object> exports) {
   tpl->SetClassName(NanNew<v8::String>("DepthCamera"));
   tpl->InstanceTemplate()->SetInternalFieldCount(1);
 
-  NODE_SET_PROTOTYPE_METHOD(tpl, "call_emit", CallEmit);
   NODE_SET_PROTOTYPE_METHOD(tpl, "start", Start);
   NODE_SET_PROTOTYPE_METHOD(tpl, "stop", Stop);
 
@@ -69,16 +67,6 @@ NAN_METHOD(DepthCamera::New) {
   }
 }
 
-NAN_METHOD(DepthCamera::CallEmit) {
-  NanScope();
-  v8::Handle<v8::Value> argv[1] = {
-    NanNew("event"),  // event name
-  };
-
-  NanMakeCallback(args.This(), "emit", 1, argv);
-  NanReturnUndefined();
-}
-
 Context g_context;
 DepthNode g_dnode;
 ColorNode g_cnode;
@@ -96,6 +84,9 @@ StereoCameraParameters g_scp;
 static uv_thread_t thread_id;
 static uv_async_t async;
 static int cmd = 0;
+
+static const int START_OK = 1;
+static const int NEW_SAMPLE = 2;
 
 /*----------------------------------------------------------------------------*/
 // New audio sample event handler
@@ -120,6 +111,7 @@ void onNewDepthSample(DepthNode node, DepthNode::NewSampleReceivedData data)
     //printf("Z#%u: %d\n",g_dFrames,data.vertices.size());
 
     // Project some 3D points in the Color Frame
+    /*
     if (!g_pProjHelper)
     {
         g_pProjHelper = new ProjectionHelper (data.stereoCameraParameters);
@@ -145,8 +137,12 @@ void onNewDepthSample(DepthNode node, DepthNode::NewSampleReceivedData data)
     
     Point2D p2DPoints[4];
     g_pProjHelper->get2DCoordinates ( p3DPoints, p2DPoints, 4, CAMERA_PLANE_COLOR);
-    
+    */
     g_dFrames++;
+
+    cmd = NEW_SAMPLE;
+    async.data = (void*) &cmd;
+    uv_async_send(&async);
 }
 
 /*----------------------------------------------------------------------------*/
@@ -172,7 +168,7 @@ void configureDepthNode()
 
     DepthNode::Configuration config = g_dnode.getConfiguration();
     config.frameFormat = FRAME_FORMAT_QVGA;
-    config.framerate = 25;
+    config.framerate = 30;
     config.mode = DepthNode::CAMERA_MODE_CLOSE_MODE;
     config.saturation = true;
 
@@ -212,6 +208,7 @@ void configureNode(Node node)
         g_context.registerNode(node);
     }
 
+    /*
     if ((node.is<ColorNode>())&&(!g_cnode.isSet()))
     {
         g_cnode = node.as<ColorNode>();
@@ -225,6 +222,7 @@ void configureNode(Node node)
         configureAudioNode();
         g_context.registerNode(node);
     }
+    */
 }
 
 /*----------------------------------------------------------------------------*/
@@ -262,9 +260,6 @@ void onDeviceDisconnected(Context context, Context::DeviceRemovedData data)
     g_bDeviceFound = false;
     printf("Device disconnected\n");
 }
-
-static const int START_OK = 1;
-static const int NEW_SAMPLE = 2;
 
 static void thread_main(void* arg) {
   printf("thread_main starts\n");
@@ -305,10 +300,11 @@ static void thread_main(void* arg) {
 }
 
 v8::Persistent<v8::Function> startCallback;
+v8::Persistent<v8::Object> thisObject;
 
 void handle_async_send(uv_async_t *handle, int) {
     int data = *((int*) handle->data);
-    printf("handle_async_send %d\n", data);
+    //printf("handle_async_send %d\n", data);
     switch (data) {
       case START_OK: {
         // start success
@@ -316,15 +312,22 @@ void handle_async_send(uv_async_t *handle, int) {
         NanMakeCallback(NanGetCurrentContext()->Global(), startCallback, 1, &arg);
         break;
       }
-      case NEW_SAMPLE:
-        // stop success
+      case NEW_SAMPLE: {
+        // new sample
+        v8::Handle<v8::Value> argv[1] = {
+          NanNew("newDepthSample"),  // event name
+        };
+
+        NanMakeCallback(thisObject, "emit", 1, argv);
         break;
+      }
     }
 }
 
 NAN_METHOD(DepthCamera::Start) {
   NanScope();
   NanAssignPersistent<v8::Function>(startCallback, args[0].As<v8::Function>());
+  NanAssignPersistent<v8::Object>(thisObject, args.This());
 
   uv_async_init(uv_default_loop(), &async, handle_async_send);
 

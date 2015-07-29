@@ -21,12 +21,16 @@ function inherits(target, source) {
 inherits(DepthCamera, EventEmitter);
 
 var dc = new DepthCamera();
-dc.on('event', function() {
-    console.log('event');
+
+var samples = 0;
+
+dc.on('newDepthSample', function() {
+    console.log('Depth Sample #' + samples++);
 });
 
 dc.start(function(e) {
   console.log('start: ' + e);
+  setTimeout(stop, 3000);
 });
 
 function stop() {
@@ -34,7 +38,3 @@ function stop() {
     console.log('stop: ' + e);
   });
 }
-
-setTimeout(stop, 3000);
-
-dc.call_emit();
