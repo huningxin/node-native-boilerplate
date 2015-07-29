@@ -29,8 +29,12 @@ dc.start(function(e) {
   console.log('start: ' + e);
 });
 
-dc.stop(function(e) {
-  console.log('stop: ' + e);
-});
+function stop() {
+  dc.stop(function(e) {
+    console.log('stop: ' + e);
+  });
+}
+
+setTimeout(stop, 3000);
 
 dc.call_emit();

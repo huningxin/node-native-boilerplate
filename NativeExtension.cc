@@ -101,7 +101,7 @@ static int cmd = 0;
 // New audio sample event handler
 void onNewAudioSample(AudioNode node, AudioNode::NewSampleReceivedData data)
 {
-    printf("A#%u: %d\n",g_aFrames,data.audioData.size());
+    //printf("A#%u: %d\n",g_aFrames,data.audioData.size());
     g_aFrames++;
 }
 
@@ -109,7 +109,7 @@ void onNewAudioSample(AudioNode node, AudioNode::NewSampleReceivedData data)
 // New color sample event handler
 void onNewColorSample(ColorNode node, ColorNode::NewSampleReceivedData data)
 {
-    printf("C#%u: %d\n",g_cFrames,data.colorMap.size());
+    //printf("C#%u: %d\n",g_cFrames,data.colorMap.size());
     g_cFrames++;
 }
 
@@ -117,7 +117,7 @@ void onNewColorSample(ColorNode node, ColorNode::NewSampleReceivedData data)
 // New depth sample event handler
 void onNewDepthSample(DepthNode node, DepthNode::NewSampleReceivedData data)
 {
-    printf("Z#%u: %d\n",g_dFrames,data.vertices.size());
+    //printf("Z#%u: %d\n",g_dFrames,data.vertices.size());
 
     // Project some 3D points in the Color Frame
     if (!g_pProjHelper)
@@ -147,10 +147,6 @@ void onNewDepthSample(DepthNode node, DepthNode::NewSampleReceivedData data)
     g_pProjHelper->get2DCoordinates ( p3DPoints, p2DPoints, 4, CAMERA_PLANE_COLOR);
     
     g_dFrames++;
-
-    // Quit the main loop after 200 depth frames received
-    if (g_dFrames == 200)
-        g_context.quit();
 }
 
 /*----------------------------------------------------------------------------*/
@@ -267,8 +263,11 @@ void onDeviceDisconnected(Context context, Context::DeviceRemovedData data)
     printf("Device disconnected\n");
 }
 
+static const int START_OK = 1;
+static const int NEW_SAMPLE = 2;
+
 static void thread_main(void* arg) {
-  printf("thread_main\n");
+  printf("thread_main starts\n");
 
   g_context = Context::create("localhost");
 
@@ -296,11 +295,13 @@ static void thread_main(void* arg) {
 
   g_context.startNodes();
 
-  g_context.run();
-
-  cmd = 1;
+  cmd = START_OK;
   async.data = (void*) &cmd;
   uv_async_send(&async);
+
+  g_context.run();
+
+  printf("thread_main ends.\n");
 }
 
 v8::Persistent<v8::Function> startCallback;
@@ -309,13 +310,13 @@ void handle_async_send(uv_async_t *handle, int) {
     int data = *((int*) handle->data);
     printf("handle_async_send %d\n", data);
     switch (data) {
-      case 1: {
+      case START_OK: {
         // start success
         v8::Handle<v8::Value> arg = NanNew("success");
         NanMakeCallback(NanGetCurrentContext()->Global(), startCallback, 1, &arg);
         break;
       }
-      case 2:
+      case NEW_SAMPLE:
         // stop success
         break;
     }
@@ -334,6 +335,17 @@ NAN_METHOD(DepthCamera::Start) {
 
 NAN_METHOD(DepthCamera::Stop) {
   NanScope();
+
+  g_context.quit();
+  g_context.stopNodes();
+
+  if (g_cnode.isSet()) g_context.unregisterNode(g_cnode);
+  if (g_dnode.isSet()) g_context.unregisterNode(g_dnode);
+  if (g_anode.isSet()) g_context.unregisterNode(g_anode);
+
+  if (g_pProjHelper)
+      delete g_pProjHelper;
+
   v8::Local<v8::Function> callbackHandle = args[0].As<v8::Function>();
 
   uv_thread_join(&thread_id);
