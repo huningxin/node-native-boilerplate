@@ -28,6 +28,7 @@ class DepthCamera : public node::ObjectWrap {
   static NAN_METHOD(New);
   static NAN_METHOD(Start);
   static NAN_METHOD(Stop);
+  static NAN_METHOD(GetDepthMap);
   static v8::Persistent<v8::Function> constructor;
 };
 
@@ -49,6 +50,7 @@ void DepthCamera::Init(v8::Handle<v8::Object> exports) {
 
   NODE_SET_PROTOTYPE_METHOD(tpl, "start", Start);
   NODE_SET_PROTOTYPE_METHOD(tpl, "stop", Stop);
+  NODE_SET_PROTOTYPE_METHOD(tpl, "getDepthMap", GetDepthMap);
 
   NanAssignPersistent<v8::Function>(constructor, tpl->GetFunction());
   exports->Set(NanNew<v8::String>("DepthCamera"), tpl->GetFunction());
@@ -87,6 +89,9 @@ static int cmd = 0;
 
 static const int START_OK = 1;
 static const int NEW_SAMPLE = 2;
+
+static int16_t depth_map[76800];
+static int32_t depth_map_size = 76800; // QVGA size
 
 /*----------------------------------------------------------------------------*/
 // New audio sample event handler
@@ -140,6 +145,12 @@ void onNewDepthSample(DepthNode node, DepthNode::NewSampleReceivedData data)
     */
     g_dFrames++;
 
+    if (depth_map_size != data.depthMap.size())
+      printf("new depth sample: size %d\n", data.depthMap.size());
+
+    const int16_t* depthMap = data.depthMap;
+    memcpy((char*)depth_map, reinterpret_cast<char*>(const_cast<int16_t*>(depthMap)), depth_map_size * sizeof(int16_t));
+
     cmd = NEW_SAMPLE;
     async.data = (void*) &cmd;
     uv_async_send(&async);
@@ -172,7 +183,7 @@ void configureDepthNode()
     config.mode = DepthNode::CAMERA_MODE_CLOSE_MODE;
     config.saturation = true;
 
-    g_dnode.setEnableVertices(true);
+    g_dnode.setEnableDepthMap(true);
 
     g_context.requestControl(g_dnode,0);
 
@@ -262,7 +273,7 @@ void onDeviceDisconnected(Context context, Context::DeviceRemovedData data)
 }
 
 static void thread_main(void* arg) {
-  printf("thread_main starts\n");
+  //printf("thread_main starts\n");
 
   g_context = Context::create("localhost");
 
@@ -282,7 +293,7 @@ static void thread_main(void* arg) {
 
       vector<Node> na = da[0].getNodes();
       
-      printf("Found %u nodes\n",na.size());
+      //printf("Found %u nodes\n",na.size());
       
       for (int n = 0; n < (int)na.size();n++)
           configureNode(na[n]);
@@ -296,7 +307,7 @@ static void thread_main(void* arg) {
 
   g_context.run();
 
-  printf("thread_main ends.\n");
+  //printf("thread_main ends.\n");
 }
 
 v8::Persistent<v8::Function> startCallback;
@@ -308,14 +319,13 @@ void handle_async_send(uv_async_t *handle, int) {
     switch (data) {
       case START_OK: {
         // start success
-        v8::Handle<v8::Value> arg = NanNew("success");
-        NanMakeCallback(NanGetCurrentContext()->Global(), startCallback, 1, &arg);
+        NanMakeCallback(NanGetCurrentContext()->Global(), startCallback, 0, NULL);
         break;
       }
       case NEW_SAMPLE: {
         // new sample
         v8::Handle<v8::Value> argv[1] = {
-          NanNew("newDepthSample"),  // event name
+          NanNew("newDepthMap"),  // event name
         };
 
         NanMakeCallback(thisObject, "emit", 1, argv);
@@ -353,9 +363,31 @@ NAN_METHOD(DepthCamera::Stop) {
 
   uv_thread_join(&thread_id);
 
-  v8::Handle<v8::Value> arg = NanNew("success");
-  NanMakeCallback(NanGetCurrentContext()->Global(), callbackHandle, 1, &arg);
+  NanMakeCallback(NanGetCurrentContext()->Global(), callbackHandle, 0, NULL);
   NanReturnUndefined(); 
+}
+
+NAN_METHOD(DepthCamera::GetDepthMap) {
+  NanScope();
+  v8::Local<v8::Object> obj = args[0]->ToObject();
+  v8::Local<v8::Function> callbackHandle = args[1].As<v8::Function>();
+  if (obj->GetIndexedPropertiesExternalArrayDataType() != 3) {
+    v8::Handle<v8::Value> arg = NanNew("arg 0 is not Int16Array");
+    NanMakeCallback(NanGetCurrentContext()->Global(), callbackHandle, 1, &arg);
+    NanReturnUndefined();
+  }
+  int length = obj->GetIndexedPropertiesExternalArrayDataLength();
+  int16_t* buffer = static_cast<int16_t*>(obj->GetIndexedPropertiesExternalArrayData());
+  if (length != depth_map_size) {
+    v8::Handle<v8::Value> arg = NanNew("length is wrong");
+    NanMakeCallback(NanGetCurrentContext()->Global(), callbackHandle, 1, &arg);
+    NanReturnUndefined();
+  }
+
+  // fill the buffer
+  memcpy((char*)buffer, (char*)depth_map, depth_map_size * sizeof(int16_t));
+  NanMakeCallback(NanGetCurrentContext()->Global(), callbackHandle, 0, NULL);
+  NanReturnUndefined();
 }
 
 void Init(v8::Handle<v8::Object> exports) {

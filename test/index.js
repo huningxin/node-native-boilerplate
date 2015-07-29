@@ -24,17 +24,34 @@ var dc = new DepthCamera();
 
 var samples = 0;
 
-dc.on('newDepthSample', function() {
-    console.log('Depth Sample #' + samples++);
+var depthMapSize = 76800; // QVGA
+var depthMap = new Int16Array(depthMapSize); 
+
+dc.on('newDepthMap', function() {
+    dc.getDepthMap(depthMap, function(error) {
+      if (typeof error == 'undefined') {
+        console.log('Got depth map #' + samples++);
+      } else {
+        console.log('Got depth map failed: ' + error);
+      }
+    });
 });
 
-dc.start(function(e) {
-  console.log('start: ' + e);
-  setTimeout(stop, 3000);
+dc.start(function(error) {
+  if (typeof error === 'undefined') {
+    console.log('start successfully.');
+    setTimeout(stop, 3000);  
+  } else {
+    console.log('start failed: ' + error);
+  }
 });
 
 function stop() {
-  dc.stop(function(e) {
-    console.log('stop: ' + e);
+  dc.stop(function(error) {
+    if (typeof error === 'undefined') {
+      console.log('stop successfully.');
+    } else {
+      console.log('stop failed: ' + error);
+    }
   });
 }
